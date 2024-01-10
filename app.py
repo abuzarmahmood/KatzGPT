@@ -19,6 +19,7 @@ from langchain.llms import OpenAI
 from langchain.chains import LLMChain
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain.prompts.prompt import PromptTemplate
+import openai
 
 ############################################################
 ## Generate Docs
@@ -84,11 +85,41 @@ def get_docs(query):
 
     docs_str = ""
     docs_str += '\n'
-    docs_str += "=== Sources ===\n"
+    docs_str += "=== Sources ===\n\n"
     for this_source, this_score in zip(docs_sources, scores): 
         docs_str += f"{this_source.split('/')[-1]}"
-        docs_str += f" === Score: {np.round(this_score,2)}\n"
+        docs_str += f" === Score: {np.round(this_score,2)}\n\n"
     return docs_str
+
+def run_query2(
+        query,
+        question_generator,
+        doc_chain,
+        ):
+    outs = vectordb.similarity_search_with_relevance_scores(query, k = 10)
+    docs, scores = zip(*outs)
+
+    prompt = f"""
+    Question: {query}
+    =========
+    {docs}
+    =========
+    Answer in Markdown:"""
+
+    completion = openai.ChatCompletion.create(
+      model="gpt-3.5-turbo-1106",
+      messages=[
+        {"role": "system", "content": "You are an AI assistant for answering questions about systems neuroscience, specifically taste processing. You are given the following extracted parts of a long document and a question. Provide a conversational answer. Always indicate your sources"}, 
+        {"role": "user", "content": prompt}
+      ],
+    )
+
+    out_str = completion.choices[0].message.content
+    docs_str = get_docs(query)
+    out_str += '\n\n'
+    out_str += docs_str
+    return out_str
+
 
 def run_query(
         query,
@@ -128,7 +159,7 @@ def run_query(
     out_str += docs_str
     return out_str
 
-run_query_simple = lambda query: run_query(query,
+run_query_simple = lambda query: run_query2(query,
                                            question_generator=question_generator,
                                            doc_chain=doc_chain,
                                            )
@@ -163,9 +194,9 @@ if prompt:
     # response: str = f"You wrote {prompt}"
     response: str = run_query_simple(prompt)
     st.session_state[MESSAGES].append(Message(actor=ASSISTANT, payload=response))
-    # st.chat_message(ASSISTANT).write(response) 
+    st.chat_message(ASSISTANT).write(response) 
     # Write each line of the response separately
     # unless it is a blank line
-    for line in response.splitlines():
-        if line:
-            st.chat_message(ASSISTANT).write(line)
+    # for line in response.splitlines():
+    #     if line:
+    #         st.chat_message(ASSISTANT).write(line)
