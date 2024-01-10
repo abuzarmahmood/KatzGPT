@@ -8,6 +8,7 @@ import os
 from tqdm import tqdm
 from joblib import Parallel, delayed 
 from pickle import dump, load
+from pprint import pprint
 
 from langchain.embeddings import OpenAIEmbeddings 
 from langchain.vectorstores import Chroma 
@@ -67,69 +68,70 @@ else:
 # Generate Embeddings
 ############################################################
 
-embeddings = OpenAIEmbeddings()
-vectordb = Chroma.from_documents([docs_list[0]], embedding=embeddings, 
-                              persist_directory=vector_persist_dir)
-vectordb.persist()
-for doc in tqdm(docs_list):
-    vectordb.add_documents([doc])
-vectordb.persist()
-
-memory = ConversationBufferMemory(
-        memory_key="chat_history", 
-        return_messages=True)
-pdf_qa = ConversationalRetrievalChain.from_llm(
-        llm = OpenAI(temperature=0.8) , 
-        retriever = vectordb.as_retriever(), 
-        # return_source_documents=True,
-        memory=memory,
-        max_tokens_limit = 3500,
-        )
-query = "Which katz lab papers discuss attractor networks?"
-result = pdf_qa({"question": query})
-print(result)
-
-##############################
-
-prompt="""
-Follow exactly those 3 steps:
-1. Read the context below and aggregrate this data
-Context : {matching_engine_response}
-2. Answer the question using only this context
-3. Show the source for your answers
-User Question: {question}
-
-
-If you don't have any context and are unsure of the answer, reply that you don't know about this topic.
-"""
-
-question_prompt = PromptTemplate.from_template(
-    template=prompt,
-    )
-
-
-question_generator = LLMChain(
-        llm=llm,
-        prompt=question_prompt,
-        verbose=True,
-    )
-
-llm = OpenAI(temperature=0)
-doc_chain = load_qa_with_sources_chain(llm)
-
-chain = ConversationalRetrievalChain(
-    retriever=vectordb.as_retriever(),
-    combine_docs_chain=doc_chain,
-    return_source_documents=True,
-    query_generator=question_generator,
-    memory=memory,
-    max_tokens_limit = 3500,
-)
+# embeddings = OpenAIEmbeddings()
+# # vectordb = Chroma.from_documents([docs_list[0]], embedding=embeddings, 
+# #                               persist_directory=vector_persist_dir)
+# # vectordb.persist()
+# # for doc in tqdm(docs_list):
+# #     vectordb.add_documents([doc])
+# # vectordb.persist()
+# 
+# memory = ConversationBufferMemory(
+#         memory_key="chat_history", 
+#         return_messages=True)
+# pdf_qa = ConversationalRetrievalChain.from_llm(
+#         llm = OpenAI(temperature=0.8) , 
+#         retriever = vectordb.as_retriever(), 
+#         # return_source_documents=True,
+#         memory=memory,
+#         max_tokens_limit = 3500,
+#         )
+# query = "Which katz lab papers discuss attractor networks?"
+# result = pdf_qa({"question": query})
+# print(result)
+# 
+# ##############################
+# 
+# prompt="""
+# Follow exactly those 3 steps:
+# 1. Read the context below and aggregrate this data
+# Context : {matching_engine_response}
+# 2. Answer the question using only this context
+# 3. Show the source for your answers
+# User Question: {question}
+# 
+# 
+# If you don't have any context and are unsure of the answer, reply that you don't know about this topic.
+# """
+# 
+# question_prompt = PromptTemplate.from_template(
+#     template=prompt,
+#     )
+# 
+# 
+# question_generator = LLMChain(
+#         llm=llm,
+#         prompt=question_prompt,
+#         verbose=True,
+#     )
+# 
+# llm = OpenAI(temperature=0)
+# doc_chain = load_qa_with_sources_chain(llm)
+# 
+# chain = ConversationalRetrievalChain(
+#     retriever=vectordb.as_retriever(),
+#     combine_docs_chain=doc_chain,
+#     return_source_documents=True,
+#     query_generator=question_generator,
+#     memory=memory,
+#     max_tokens_limit = 3500,
+# )
 
 ##############################
 embeddings = OpenAIEmbeddings()
 vectordb = Chroma(persist_directory=vector_persist_dir, 
-                  embedding_function=embeddings)
+                  embedding_function=embeddings,
+                  collection_metadata={"hnsw:space": "cosine"})
 
 template = """You are an AI assistant for answering questions about systems neuroscience, specifically taste processing.
 You are given the following extracted parts of a long document and a question. Provide a conversational answer.
@@ -148,7 +150,10 @@ QA_PROMPT = PromptTemplate(
                        ]
         )
 
-llm = OpenAI(temperature=0.8)
+from langchain.chat_models import ChatOpenAI
+llm = ChatOpenAI(temperature=0.8, model="gpt-3.5-turbo-0613")
+
+# llm = OpenAI(temperature=0.8)
 question_generator = LLMChain(
         llm=llm,
         prompt=QA_PROMPT,
@@ -164,20 +169,44 @@ memory = ConversationBufferMemory(
         output_key="answer",
         return_messages=True)
 retriever = vectordb.as_retriever(
-        search_kwargs = {"k":5})
+        search_kwargs = {"k":50})
 pdf_qa = ConversationalRetrievalChain(
     retriever=retriever,
     question_generator=question_generator,
     combine_docs_chain=doc_chain,
     return_source_documents=True,
     memory=memory,
-    max_tokens_limit = 2000,
+    max_tokens_limit = 1000,
     rephrase_question = False,
     verbose=True,
 )
-query = "Where is the gustatory thalamus?" 
+query = "Protocol for conditioned taste aversion" + \
+        " Give detailed answer" 
 result = pdf_qa({"question": query})
 for this_key in result.keys():
     if this_key not in ['chat_history', 'source_documents']:
         print()
         print(f"{this_key} : {result[this_key]}")
+
+############################################################
+# Direct search
+# query = 'global workspace' 
+# docs = vectordb.similarity_search(query, k = 50)
+outs = vectordb.similarity_search_with_relevance_scores(query, k = 10)
+docs, scores = zip(*outs)
+
+docs_sources = list(set([doc.metadata['source'] for doc in docs]))
+
+for this_source, this_score in zip(docs_sources, scores): 
+    print(this_source.split('/')[-1])
+    print(this_score)
+    print('===========================')
+
+# test = vectordb.get()
+# metadata = test['metadatas']
+# sources = [this_metadata['source'] for this_metadata in metadata]
+# source_set = list(set(sources))
+# source_set = [this_source.split('/')[-1] for this_source in source_set]
+# print(len(source_set))
+# 
+# pprint(source_set)
