@@ -1,5 +1,6 @@
 """
 https://levelup.gitconnected.com/langchain-for-multiple-pdf-files-87c966e0c032
+https://medium.com/data-professor/beginners-guide-to-openai-api-a0420bc58ee5
 """
 
 from langchain.document_loaders import PyPDFLoader, PyPDFDirectoryLoader
