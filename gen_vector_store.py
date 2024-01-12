@@ -2,6 +2,11 @@
 Generate a vector store for use in RAG-LLM given
 PDFs of scientific articles.
 """
+
+############################################################
+## Imports 
+############################################################
+
 from glob import glob
 import os
 from tqdm import tqdm
@@ -12,6 +17,10 @@ from utils import return_paths
 from langchain.document_loaders import PyPDFLoader, PyPDFDirectoryLoader
 from langchain.embeddings import OpenAIEmbeddings 
 from langchain.vectorstores import Chroma 
+
+############################################################
+## Convenience Functions 
+############################################################
 
 def parallelize(data, func, num_of_processes=8):
     """
@@ -45,10 +54,10 @@ def try_load(this_path):
         print(f'Load failed : {this_path}')
         return None
 
-
 ############################################################
 ## Generate Docs
 ############################################################
+
 (
     file_list, 
     docs_output_path, 

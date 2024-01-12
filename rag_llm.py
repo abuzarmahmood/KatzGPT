@@ -1,3 +1,11 @@
+"""
+This file contains the functions for running the LLM.
+"""
+
+############################################################
+## Imports 
+############################################################
+
 import os
 from tqdm import tqdm
 from pickle import dump, load
@@ -9,7 +17,7 @@ from langchain.vectorstores import Chroma
 import openai
 
 ############################################################
-# Generate Embeddings
+# Define Functions 
 ############################################################
 
 def return_vectordb():

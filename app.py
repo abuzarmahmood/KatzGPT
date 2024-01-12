@@ -1,7 +1,18 @@
+"""
+This is the main app file for the Streamlit app.
+"""
+
+############################################################
+## Imports 
+############################################################
+
 import streamlit as st
 from dataclasses import dataclass
 from rag_llm import run_query, return_vectordb
 
+############################################################
+# Get Vector Database 
+############################################################
 vectordb = return_vectordb()
 
 ############################################################
